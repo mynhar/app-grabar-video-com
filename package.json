@@ -1,0 +1,13 @@
+{
+  "name": "app-grabar-video-com",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capas: grabador de pantalla y cámara en el navegador.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

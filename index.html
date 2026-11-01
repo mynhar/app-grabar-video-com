@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mis videos · Capas</title>
+  <meta name="description" content="Graba tu pantalla y tu cámara, y guarda tus videos para verlos, descargarlos o compartirlos.">
+  <meta name="theme-color" content="#17313F">
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+  <link rel="stylesheet" href="css/styles.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#/" aria-label="Capas, ir a Mis videos">
+        <svg class="brand-mark" viewBox="0 0 100 120" aria-hidden="true"><path d="M50,0 L100,26 L50,52 L0,26 z" fill="#3EC5B5"/><path d="M50,34 L100,60 L50,86 L0,60 z" fill="#2A96A8"/><path d="M50,68 L100,94 L50,120 L0,94 z" fill="#2E9BC4"/></svg>
+        <span><span class="brand-name">Capas</span><span class="brand-desc">GRABADOR DE VIDEO</span></span>
+      </a>
+      <nav class="nav" aria-label="Principal">
+        <a class="nav-item is-active" href="#/" data-icon="grid">Mis videos<span class="nav-count" id="nav-count"></span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <p class="storage" id="storage"></p>
+        <div class="signature"><strong>Harold M. Bonilla López</strong><span>DESARROLLO DE SOFTWARE</span></div>
+      </div>
+    </aside>
+    <main class="main" id="view"></main>
+  </div>
+
+  <dialog class="dialog" id="recorder" aria-labelledby="rec-title">
+    <div class="dialog-head">
+      <h2 id="rec-title">Nueva grabación</h2>
+      <button class="icon-btn" type="button" data-close data-icon="x" aria-label="Cerrar"></button>
+    </div>
+    <div class="recorder-body">
+      <div class="segmented" role="radiogroup" aria-label="Qué quieres grabar">
+        <label><input type="radio" name="mode" value="screen-camera"><span data-icon="screenCam">Pantalla y cámara</span></label>
+        <label><input type="radio" name="mode" value="screen"><span data-icon="monitor">Solo pantalla</span></label>
+        <label><input type="radio" name="mode" value="camera"><span data-icon="webcam">Solo cámara</span></label>
+      </div>
+      <div class="preview" id="rec-preview">
+        <div class="preview-screen"><span data-icon="monitor"></span><p id="preview-text"></p></div>
+        <video muted playsinline autoplay></video>
+      </div>
+      <div class="cols-2">
+        <label class="field" id="cam-field"><span class="field-label" data-icon="webcam">Cámara</span><select id="cam-select"></select></label>
+        <label class="field"><span class="field-label" data-icon="mic">Micrófono</span><select id="mic-select"></select><span class="meter" id="mic-meter" aria-hidden="true"><span></span></span></label>
+      </div>
+      <label class="check" id="sys-field"><input type="checkbox" id="sys-audio"> Incluir el audio de la pantalla o pestaña</label>
+      <p class="hint" id="rec-hint" role="status"></p>
+    </div>
+    <div class="dialog-foot">
+      <button class="btn btn-primary btn-lg btn-block" type="button" id="start-rec"><span class="rec-dot-sm"></span>Empezar grabación</button>
+    </div>
+  </dialog>
+
+  <dialog class="dialog dialog-sm" id="confirm-dialog">
+    <form method="dialog">
+      <h2></h2>
+      <p></p>
+      <div class="dialog-actions">
+        <button class="btn btn-danger" value="ok"></button>
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="dialog dialog-sm" id="rename-dialog">
+    <form method="dialog">
+      <h2>Cambiar título</h2>
+      <input class="input" name="title" maxlength="120" required aria-label="Título del video">
+      <div class="dialog-actions">
+        <button class="btn btn-primary" value="ok">Guardar</button>
+        <button class="btn btn-ghost" type="button" data-close>Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="rec-camera" id="rec-camera" hidden><video muted playsinline autoplay></video></div>
+  <video class="pip-source" id="pip-source" muted playsinline autoplay></video>
+  <div class="countdown" id="countdown" hidden><span></span></div>
+
+  <div class="rec-bar" id="rec-bar" role="toolbar" aria-label="Controles de grabación" hidden>
+    <span class="rec-dot" aria-hidden="true"></span>
+    <span class="rec-time" id="rec-time">0:00</span>
+    <span class="rec-sep"></span>
+    <button class="rec-btn" type="button" id="pause-btn"></button>
+    <button class="rec-btn rec-stop" type="button" id="stop-btn" data-icon="stop">Terminar</button>
+    <button class="rec-btn" type="button" id="discard-btn" data-icon="trash" aria-label="Descartar grabación" title="Descartar grabación"></button>
+    <button class="rec-btn" type="button" id="bubble-btn" data-icon="bubble" aria-label="Abrir controles flotantes" title="Abrir controles flotantes" hidden></button>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+</body>
+</html>
