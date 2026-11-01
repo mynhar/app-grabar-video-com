@@ -583,10 +583,12 @@ svg{width:16px;height:16px}
 .count{position:fixed;inset:0;display:grid;place-items:center;background:rgba(23,49,63,.85);color:#3EC5B5;font:700 72px/1 "Space Grotesk",system-ui,sans-serif}
 .count[hidden]{display:none}`;
 
+const PIP_CAM = { width: 280, height: 280 };
+const PIP_BAR = { width: 240, height: 60 };
+
 function openFloating(withCam) {
   if (canDocPip) {
-    const size = withCam ? { width: 280, height: 280 } : { width: 240, height: 60 };
-    return documentPictureInPicture.requestWindow(size).then((win) => ({ kind: 'doc', win })).catch(() => null);
+    return documentPictureInPicture.requestWindow(withCam ? PIP_CAM : PIP_BAR).then((win) => ({ kind: 'doc', win })).catch(() => null);
   }
   if (withCam && document.pictureInPictureEnabled && pipVideo.readyState >= 1) {
     return pipVideo.requestPictureInPicture().then(() => ({ kind: 'video' })).catch(() => null);
@@ -600,6 +602,25 @@ function closeFloating(floating) {
 }
 
 const floatingDoc = () => (R.floating?.kind === 'doc' ? R.floating.win.document : null);
+
+async function floatControls(manual) {
+  const s = R.session;
+  if (!s || R.floating || R.finishing) return;
+  const floating = await openFloating(!!s.camera && !R.camHidden);
+  if (R.session !== s) { closeFloating(floating); return; }
+  if (!floating) {
+    if (manual) toast('El navegador no permitió abrir la ventana flotante.', 'error');
+    return;
+  }
+  attachFloating(floating);
+  showRecordingUI();
+}
+
+// Chrome 120+ calls this handler when the user switches tabs while the page captures camera or mic,
+// granting the activation requestWindow() needs; it closes that window itself when the tab is visible again.
+function setAutoFloating(on) {
+  try { navigator.mediaSession?.setActionHandler('enterpictureinpicture', on ? () => floatControls(false) : null); } catch {}
+}
 
 function attachFloating(floating) {
   R.floating = floating;
@@ -660,7 +681,8 @@ async function startRecording() {
       systemAudio: prefs.sysAudio ? 'include' : 'exclude',
     });
   }
-  const floatingPromise = mode === 'camera' ? Promise.resolve(null) : openFloating(mode === 'screen-camera' && !!R.cam);
+  // With a camera, start with the round in-page bubble; it floats when the user leaves the tab.
+  const floatingPromise = mode !== 'camera' && !R.cam ? openFloating(false) : Promise.resolve(null);
 
   let display = null;
   try {
@@ -683,6 +705,7 @@ async function startRecording() {
   R.thumb = null;
   R.finishing = false;
   session.addEventListener('ended', () => (session.state === 'idle' ? cancelRecording() : finishRecording()));
+  if (mode !== 'camera') setAutoFloating(true);
 
   attachFloating(await floatingPromise);
   if (R.session !== session) return;
@@ -740,25 +763,25 @@ function showRecordingUI() {
   updateRecUI();
 }
 
-async function toggleCamera() {
+function toggleCamera() {
   const s = R.session;
   if (!s?.camera || s.mode !== 'screen-camera') return;
   R.camHidden = !R.camHidden;
   const f = R.floating;
   if (f?.kind === 'doc') {
     const win = f.win;
+    const frameW = win.outerWidth - win.innerWidth;
+    const frameH = win.outerHeight - win.innerHeight;
     if (R.camHidden) {
       R.pipSize = [win.outerWidth, win.outerHeight];
-      resizeWindow(win, 240, 60 + win.outerHeight - win.innerHeight);
-    } else if (R.pipSize) {
-      resizeWindow(win, ...R.pipSize);
+      resizeWindow(win, PIP_BAR.width + frameW, PIP_BAR.height + frameH);
+    } else {
+      resizeWindow(win, ...(R.pipSize ?? [PIP_CAM.width + frameW, PIP_CAM.height + frameH]));
     }
   } else if (f?.kind === 'video' && R.camHidden) {
     closeFloating(f);
-  } else if (!f && !R.camHidden && !canDocPip && document.pictureInPictureEnabled) {
-    attachFloating(await openFloating(true));
   }
-  if (R.session === s) showRecordingUI();
+  showRecordingUI();
 }
 
 function resizeWindow(win, width, height) {
@@ -943,6 +966,7 @@ async function cancelRecording(ask = false) {
 
 function teardownRecordingUI() {
   clearInterval(R.timer);
+  setAutoFloating(false);
   const floating = R.floating;
   R.floating = null;
   closeFloating(floating);
@@ -977,13 +1001,7 @@ $('#pause-btn').addEventListener('click', togglePause);
 $('#stop-btn').addEventListener('click', finishRecording);
 $('#discard-btn').addEventListener('click', () => cancelRecording(true));
 $('#cam-btn').addEventListener('click', toggleCamera);
-$('#bubble-btn').addEventListener('click', async () => {
-  const floating = await openFloating(!!R.session?.camera);
-  if (!R.session) { closeFloating(floating); return; }
-  if (!floating) { toast('El navegador no permitió abrir la ventana flotante.', 'error'); return; }
-  attachFloating(floating);
-  showRecordingUI();
-});
+$('#bubble-btn').addEventListener('click', () => floatControls(true));
 
 addEventListener('hashchange', route);
 route();
