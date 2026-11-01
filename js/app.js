@@ -558,6 +558,41 @@ function stopMeter() {
   R.meter = null;
 }
 
+/* ---------- Browser extension ---------- */
+
+// The Capas extension (extension/) draws the round camera bubble on top of every tab. Its bridge script on
+// this page answers our ping, receives the recording state and forwards the clicks on the bubble's buttons.
+let hasExt = false;
+
+function syncExt() {
+  if (!hasExt) return;
+  const s = R.session;
+  const state = s && s.mode !== 'camera' ? {
+    status: R.finishing ? 'saving' : s.state,
+    elapsed: s.time,
+    at: Date.now(),
+    camera: !!s.camera,
+    camVisible: !!s.camera && !R.camHidden,
+    camLabel: s.camera?.getVideoTracks()[0]?.label ?? '',
+  } : null;
+  postMessage({ source: 'capas-app', type: 'state', state }, location.origin);
+}
+
+addEventListener('message', (e) => {
+  if (e.source !== window || e.data?.source !== 'capas-ext') return;
+  if (e.data.type === 'hello' && !hasExt) {
+    hasExt = true;
+    if (R.session) showRecordingUI();
+    else syncExt();
+  }
+  if (e.data.type === 'cmd') {
+    if (e.data.cmd === 'pause') togglePause();
+    if (e.data.cmd === 'stop') finishRecording();
+    if (e.data.cmd === 'cam') toggleCamera();
+  }
+});
+postMessage({ source: 'capas-app', type: 'ping' }, location.origin);
+
 /* ---------- Recording ---------- */
 
 const PIP_CSS = `
@@ -602,11 +637,13 @@ function closeFloating(floating) {
 }
 
 const floatingDoc = () => (R.floating?.kind === 'doc' ? R.floating.win.document : null);
+// With the extension, the camera lives in its bubble and the floating window only holds the controls.
+const pipCam = () => !hasExt && !!R.session?.camera;
 
 async function floatControls(manual) {
   const s = R.session;
   if (!s || R.floating || R.finishing) return;
-  const floating = await openFloating(!!s.camera && !R.camHidden);
+  const floating = await openFloating(pipCam() && !R.camHidden);
   if (R.session !== s) { closeFloating(floating); return; }
   if (!floating) {
     if (manual) toast('El navegador no permitió abrir la ventana flotante.', 'error');
@@ -635,7 +672,7 @@ function attachFloating(floating) {
     return;
   }
   const doc = floating.win.document;
-  const camera = R.session.camera;
+  const camera = pipCam() ? R.session.camera : null;
   doc.head.innerHTML = `<meta charset="utf-8"><title>Grabando · Capas</title><style>${PIP_CSS}</style>`;
   doc.body.innerHTML = `
     ${camera ? `<div class="cam"><video autoplay muted playsinline></video></div>
@@ -682,7 +719,8 @@ async function startRecording() {
     });
   }
   // With a camera, start with the round in-page bubble; it floats when the user leaves the tab.
-  const floatingPromise = mode !== 'camera' && !R.cam ? openFloating(false) : Promise.resolve(null);
+  // The extension shows its own bubble and controls in every tab, so no window is needed then.
+  const floatingPromise = mode !== 'camera' && !R.cam && !hasExt ? openFloating(false) : Promise.resolve(null);
 
   let display = null;
   try {
@@ -705,7 +743,7 @@ async function startRecording() {
   R.thumb = null;
   R.finishing = false;
   session.addEventListener('ended', () => (session.state === 'idle' ? cancelRecording() : finishRecording()));
-  if (mode !== 'camera') setAutoFloating(true);
+  if (mode !== 'camera' && !hasExt) setAutoFloating(true);
 
   attachFloating(await floatingPromise);
   if (R.session !== session) return;
@@ -751,12 +789,12 @@ function showRecordingUI() {
   const s = R.session;
   const cam = $('#rec-camera');
   const camOn = !!s.camera && !R.camHidden;
-  const inPageCam = s.mode === 'camera' || (camOn && !R.floating);
+  const inPageCam = s.mode === 'camera' || (camOn && !R.floating && !hasExt);
   cam.hidden = !inPageCam;
   cam.className = `rec-camera ${s.mode === 'camera' ? 'is-stage' : 'is-bubble'}`;
   $('video', cam).srcObject = inPageCam ? s.camera : null;
   if (inPageCam && s.mode !== 'camera') placeBubble();
-  const canFloat = s.mode !== 'camera' && (canDocPip || (camOn && document.pictureInPictureEnabled));
+  const canFloat = s.mode !== 'camera' && (canDocPip || (camOn && pipCam() && document.pictureInPictureEnabled));
   $('#bubble-btn').hidden = !canFloat || !!R.floating;
   $('#cam-btn').hidden = !(s.mode === 'screen-camera' && s.camera);
   $('#rec-bar').hidden = false;
@@ -768,7 +806,7 @@ function toggleCamera() {
   if (!s?.camera || s.mode !== 'screen-camera') return;
   R.camHidden = !R.camHidden;
   const f = R.floating;
-  if (f?.kind === 'doc') {
+  if (f?.kind === 'doc' && pipCam()) {
     const win = f.win;
     const frameW = win.outerWidth - win.innerWidth;
     const frameH = win.outerHeight - win.innerHeight;
@@ -892,11 +930,12 @@ function updateRecUI() {
   const doc = floatingDoc();
   if (doc) {
     doc.body.classList.toggle('paused', paused);
-    doc.body.classList.toggle('no-cam', !s.camera || R.camHidden);
+    doc.body.classList.toggle('no-cam', !pipCam() || R.camHidden);
     setBtn(doc.querySelector('[data-act="pause"]'), icon(paused ? 'play' : 'pause'), label);
     setBtn(doc.querySelector('[data-act="cam"]'), camIcon, camLabel);
   }
   tick();
+  syncExt();
 }
 
 function togglePause() {
@@ -912,6 +951,7 @@ async function finishRecording() {
   if (!s || R.finishing) return;
   if (s.state === 'idle') { cancelRecording(); return; }
   R.finishing = true;
+  syncExt();
   $('#rec-bar').classList.add('is-saving');
   $('#rec-time').textContent = 'Guardando…';
   const { blob, duration } = await s.stop();
@@ -980,6 +1020,7 @@ function teardownRecordingUI() {
   $('video', cam).srcObject = null;
   pipVideo.srcObject = null;
   document.title = restTitle;
+  syncExt();
 }
 
 addEventListener('beforeunload', (e) => {

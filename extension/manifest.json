@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Capas · burbuja de cámara",
+  "version": "1.0.0",
+  "description": "Muestra la burbuja redonda de la cámara de Capas en todas las pestañas mientras grabas.",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js" },
+  "action": {
+    "default_title": "Mostrar u ocultar la cámara de Capas",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png" }
+  },
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "content_scripts": [
+    { "matches": ["<all_urls>"], "js": ["bubble.js"] },
+    { "matches": ["http://localhost/*", "http://127.0.0.1/*"], "js": ["bridge.js"] }
+  ],
+  "web_accessible_resources": [{ "resources": ["camera.html"], "matches": ["<all_urls>"] }]
+}
