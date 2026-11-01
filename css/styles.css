@@ -289,12 +289,28 @@ select:focus, .input:focus { outline: none; border-color: var(--blue); box-shado
 .rec-bar.is-saving .rec-btn { opacity: .5; pointer-events: none; }
 @keyframes pulse { 50% { opacity: .35; } }
 
-.rec-camera { position: fixed; z-index: 30; overflow: hidden; background: #0E222D; }
-.rec-camera video { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+.rec-camera { position: fixed; z-index: 30; }
+.rec-camera video { display: block; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); background: #0E222D; }
 .rec-camera.is-bubble {
-  left: 24px; bottom: 24px; width: 200px; height: 200px; border-radius: 50%;
-  box-shadow: 0 0 0 4px var(--teal), 0 16px 40px rgba(23, 49, 63, .35);
+  left: var(--bx, 24px); top: var(--by, 24px); width: var(--bs, 200px); height: var(--bs, 200px);
+  cursor: grab; touch-action: none; user-select: none;
 }
+.rec-camera.is-bubble.is-dragging { cursor: grabbing; }
+.rec-camera.is-bubble video { border-radius: 50%; box-shadow: 0 0 0 4px var(--teal), 0 16px 40px rgba(23, 49, 63, .35); pointer-events: none; }
+.bubble-tools {
+  position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%);
+  display: flex; gap: 4px; padding: 4px;
+  border-radius: 999px; background: var(--ink); box-shadow: 0 8px 20px rgba(23, 49, 63, .3);
+  opacity: 0; transition: opacity .15s;
+}
+.rec-camera.is-bubble:hover .bubble-tools, .rec-camera.is-bubble:focus-within .bubble-tools { opacity: 1; }
+.rec-camera.is-stage .bubble-tools { display: none; }
+.bubble-tools button {
+  display: grid; place-items: center; width: 30px; height: 30px;
+  border: 0; border-radius: 50%; background: rgba(255, 255, 255, .1); color: #fff; cursor: pointer;
+}
+.bubble-tools button:hover { background: rgba(255, 255, 255, .22); }
+.bubble-tools .icon { width: 16px; height: 16px; }
 .rec-camera.is-stage { inset: 0; display: grid; place-items: center; padding: 32px 32px 104px; background: var(--ink); }
 .rec-camera.is-stage video {
   width: min(100%, calc((100vh - 136px) * 16 / 9)); height: auto; aspect-ratio: 16 / 9;
@@ -371,7 +387,6 @@ select:focus, .input:focus { outline: none; border-color: var(--blue); box-shado
   .title-input { font-size: 22px; }
   .cols-2 { flex-direction: column; }
   .rec-bar { bottom: 16px; }
-  .rec-camera.is-bubble { left: 16px; bottom: 88px; width: 120px; height: 120px; }
   .rec-camera.is-stage { padding: 16px 16px 96px; }
 }
 

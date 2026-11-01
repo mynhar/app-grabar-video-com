@@ -80,7 +80,14 @@
     </form>
   </dialog>
 
-  <div class="rec-camera" id="rec-camera" hidden><video muted playsinline autoplay></video></div>
+  <div class="rec-camera" id="rec-camera" hidden>
+    <video muted playsinline autoplay></video>
+    <div class="bubble-tools">
+      <button type="button" data-bubble="smaller" data-icon="minus" aria-label="Hacer la cámara más pequeña" title="Más pequeña"></button>
+      <button type="button" data-bubble="bigger" data-icon="plus" aria-label="Hacer la cámara más grande" title="Más grande"></button>
+      <button type="button" data-bubble="hide" data-icon="webcamOff" aria-label="Ocultar cámara" title="Ocultar cámara"></button>
+    </div>
+  </div>
   <video class="pip-source" id="pip-source" muted playsinline autoplay></video>
   <div class="countdown" id="countdown" hidden><span></span></div>
 
@@ -90,6 +97,7 @@
     <span class="rec-sep"></span>
     <button class="rec-btn" type="button" id="pause-btn"></button>
     <button class="rec-btn rec-stop" type="button" id="stop-btn" data-icon="stop">Terminar</button>
+    <button class="rec-btn" type="button" id="cam-btn" hidden></button>
     <button class="rec-btn" type="button" id="discard-btn" data-icon="trash" aria-label="Descartar grabación" title="Descartar grabación"></button>
     <button class="rec-btn" type="button" id="bubble-btn" data-icon="bubble" aria-label="Abrir controles flotantes" title="Abrir controles flotantes" hidden></button>
   </div>

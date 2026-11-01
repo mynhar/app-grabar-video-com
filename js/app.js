@@ -404,7 +404,7 @@ async function renderViewer(videoId, id) {
 
 const recDialog = $('#recorder');
 const pipVideo = $('#pip-source');
-const R = { cam: null, mic: null, camError: null, micError: null, meter: null, session: null, floating: null, timer: 0, thumb: null, size: null, starting: false, finishing: false };
+const R = { cam: null, mic: null, camError: null, micError: null, meter: null, session: null, floating: null, timer: 0, thumb: null, size: null, starting: false, finishing: false, camHidden: false, pipSize: null };
 let restTitle = document.title;
 
 async function openRecorder() {
@@ -521,7 +521,7 @@ function updatePreview() {
   $('#sys-field').hidden = mode === 'camera';
   $('#preview-text').textContent = mode === 'camera'
     ? (R.cam ? '' : 'La cámara está apagada')
-    : 'Al empezar elegirás la pantalla, la ventana o la pestaña que quieres grabar.';
+    : 'Al empezar se seleccionará la pantalla completa. También puedes elegir una ventana o una pestaña.';
 
   const hints = [];
   if (!canRecordScreen) hints.push('Este navegador no permite grabar la pantalla; puedes grabar con la cámara.');
@@ -562,24 +562,30 @@ function stopMeter() {
 
 const PIP_CSS = `
 *{box-sizing:border-box;margin:0}html,body{height:100%}
-body{display:flex;flex-direction:column;background:#17313F;color:#fff;font:500 14px/1 Inter,system-ui,sans-serif;overflow:hidden;user-select:none}
-.cam{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:12px 12px 4px}
-.cam video{height:100%;max-width:100%;aspect-ratio:1;object-fit:cover;border-radius:50%;transform:scaleX(-1);box-shadow:0 0 0 3px #3EC5B5;background:#0E222D}
-.bar{flex:none;height:56px;display:flex;align-items:center;gap:8px;padding:0 12px}
-.dot{width:10px;height:10px;border-radius:50%;background:#E5484D;animation:p 1.4s ease-in-out infinite}
+body{position:relative;display:grid;place-items:center;background:#17313F;color:#fff;font:500 14px/1 Inter,system-ui,sans-serif;overflow:hidden;user-select:none}
+.cam{position:absolute;inset:0;display:grid;place-items:center}
+.cam video{width:calc(min(100vw,100vh) - 10px);aspect-ratio:1;object-fit:cover;border-radius:50%;transform:scaleX(-1);box-shadow:0 0 0 3px #3EC5B5;background:#0E222D}
+.bar{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:5px 5px 5px 12px;border-radius:999px;background:rgba(14,34,45,.92);box-shadow:0 6px 18px rgba(0,0,0,.35);white-space:nowrap}
+.size{position:absolute;top:8px;right:8px;display:flex;gap:4px}
+.bar,.size{opacity:0;transition:opacity .15s}
+body:hover .bar,body:hover .size,body:focus-within .bar,body:focus-within .size,body.no-cam .bar{opacity:1}
+body.no-cam .cam,body.no-cam .size{display:none}
+body.no-cam .bar{position:static;transform:none;background:none;box-shadow:none}
+.dot{width:9px;height:9px;border-radius:50%;background:#E5484D;animation:p 1.4s ease-in-out infinite}
 .paused .dot{animation:none;background:#8FB0C0}
 @keyframes p{50%{opacity:.35}}
-.time{min-width:44px;font-size:15px;font-variant-numeric:tabular-nums}.grow{flex:1}
-button{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:rgba(255,255,255,.1);color:#fff}
-button:hover{background:rgba(255,255,255,.18)}button:focus-visible{outline:2px solid #3EC5B5;outline-offset:2px}
+.time{min-width:38px;font-size:14px;font-variant-numeric:tabular-nums}
+button{all:unset;cursor:pointer;width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:rgba(255,255,255,.12);color:#fff}
+.size button{background:rgba(14,34,45,.85)}
+button:hover{background:rgba(255,255,255,.24)}button:focus-visible{outline:2px solid #3EC5B5;outline-offset:2px}
 button.stop{background:#E5484D}button.stop:hover{background:#CF3B40}
-svg{width:18px;height:18px}
+svg{width:16px;height:16px}
 .count{position:fixed;inset:0;display:grid;place-items:center;background:rgba(23,49,63,.85);color:#3EC5B5;font:700 72px/1 "Space Grotesk",system-ui,sans-serif}
 .count[hidden]{display:none}`;
 
 function openFloating(withCam) {
   if (canDocPip) {
-    const size = withCam ? { width: 260, height: 320 } : { width: 320, height: 64 };
+    const size = withCam ? { width: 280, height: 280 } : { width: 240, height: 60 };
     return documentPictureInPicture.requestWindow(size).then((win) => ({ kind: 'doc', win })).catch(() => null);
   }
   if (withCam && document.pictureInPictureEnabled && pipVideo.readyState >= 1) {
@@ -611,11 +617,16 @@ function attachFloating(floating) {
   const camera = R.session.camera;
   doc.head.innerHTML = `<meta charset="utf-8"><title>Grabando · Capas</title><style>${PIP_CSS}</style>`;
   doc.body.innerHTML = `
-    ${camera ? '<div class="cam"><video autoplay muted playsinline></video></div>' : ''}
+    ${camera ? `<div class="cam"><video autoplay muted playsinline></video></div>
+    <div class="size">
+      <button type="button" data-act="smaller" title="Más pequeña" aria-label="Hacer la cámara más pequeña">${icon('minus')}</button>
+      <button type="button" data-act="bigger" title="Más grande" aria-label="Hacer la cámara más grande">${icon('plus')}</button>
+    </div>` : ''}
     <div class="bar">
-      <span class="dot"></span><span class="time">0:00</span><span class="grow"></span>
+      <span class="dot"></span><span class="time">0:00</span>
       <button type="button" data-act="pause" title="Pausar" aria-label="Pausar">${icon('pause')}</button>
       <button type="button" data-act="stop" class="stop" title="Terminar y guardar" aria-label="Terminar y guardar">${icon('stop')}</button>
+      ${camera ? '<button type="button" data-act="cam"></button>' : ''}
     </div>
     <div class="count" hidden></div>`;
   const v = doc.querySelector('video');
@@ -624,6 +635,9 @@ function attachFloating(floating) {
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'pause') togglePause();
     if (act === 'stop') finishRecording();
+    if (act === 'cam') toggleCamera();
+    if (act === 'smaller') resizeFloating(-40);
+    if (act === 'bigger') resizeFloating(40);
   });
   floating.win.addEventListener('pagehide', onGone);
   updateRecUI();
@@ -638,8 +652,9 @@ async function startRecording() {
   let displayPromise = null;
   if (mode !== 'camera') {
     displayPromise = navigator.mediaDevices.getDisplayMedia({
-      video: { frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: { displaySurface: 'monitor', frameRate: { ideal: 30 }, width: { ideal: 1920 }, height: { ideal: 1080 } },
       audio: prefs.sysAudio,
+      monitorTypeSurfaces: 'include',
       selfBrowserSurface: 'include',
       surfaceSwitching: 'include',
       systemAudio: prefs.sysAudio ? 'include' : 'exclude',
@@ -712,16 +727,120 @@ function setFloatingCount(n) {
 function showRecordingUI() {
   const s = R.session;
   const cam = $('#rec-camera');
-  const camVideo = $('video', cam);
-  const inPageCam = s.mode === 'camera' || (s.camera && !R.floating);
+  const camOn = !!s.camera && !R.camHidden;
+  const inPageCam = s.mode === 'camera' || (camOn && !R.floating);
   cam.hidden = !inPageCam;
   cam.className = `rec-camera ${s.mode === 'camera' ? 'is-stage' : 'is-bubble'}`;
-  camVideo.srcObject = inPageCam ? s.camera : null;
-  const canFloat = s.mode !== 'camera' && (canDocPip || (s.camera && document.pictureInPictureEnabled));
+  $('video', cam).srcObject = inPageCam ? s.camera : null;
+  if (inPageCam && s.mode !== 'camera') placeBubble();
+  const canFloat = s.mode !== 'camera' && (canDocPip || (camOn && document.pictureInPictureEnabled));
   $('#bubble-btn').hidden = !canFloat || !!R.floating;
+  $('#cam-btn').hidden = !(s.mode === 'screen-camera' && s.camera);
   $('#rec-bar').hidden = false;
   updateRecUI();
 }
+
+async function toggleCamera() {
+  const s = R.session;
+  if (!s?.camera || s.mode !== 'screen-camera') return;
+  R.camHidden = !R.camHidden;
+  const f = R.floating;
+  if (f?.kind === 'doc') {
+    const win = f.win;
+    if (R.camHidden) {
+      R.pipSize = [win.outerWidth, win.outerHeight];
+      resizeWindow(win, 240, 60 + win.outerHeight - win.innerHeight);
+    } else if (R.pipSize) {
+      resizeWindow(win, ...R.pipSize);
+    }
+  } else if (f?.kind === 'video' && R.camHidden) {
+    closeFloating(f);
+  } else if (!f && !R.camHidden && !canDocPip && document.pictureInPictureEnabled) {
+    attachFloating(await openFloating(true));
+  }
+  if (R.session === s) showRecordingUI();
+}
+
+function resizeWindow(win, width, height) {
+  try { win.resizeTo(Math.round(width), Math.round(height)); } catch {}
+}
+
+function resizeFloating(delta) {
+  const win = R.floating?.kind === 'doc' && R.floating.win;
+  if (!win || R.camHidden) return;
+  const frameW = win.outerWidth - win.innerWidth;
+  const frameH = win.outerHeight - win.innerHeight;
+  const side = Math.min(screen.availHeight - frameH, Math.max(200, Math.max(win.innerWidth, win.innerHeight) + delta));
+  resizeWindow(win, side + frameW, side + frameH);
+}
+
+/* In-page camera bubble: shown when there is no floating window. Drag to move, wheel or +/- to resize. */
+const bubble = { size: prefs.bubbleSize || 200, x: null, y: null };
+const camEl = $('#rec-camera');
+
+function placeBubble() {
+  const max = Math.max(96, Math.min(480, innerWidth - 32, innerHeight - 32));
+  bubble.size = Math.round(Math.min(max, Math.max(96, bubble.size)));
+  if (bubble.x == null) {
+    bubble.x = 24;
+    bubble.y = innerHeight - bubble.size - 24;
+  }
+  bubble.x = Math.round(Math.min(innerWidth - bubble.size - 8, Math.max(8, bubble.x)));
+  bubble.y = Math.round(Math.min(innerHeight - bubble.size - 8, Math.max(8, bubble.y)));
+  camEl.style.setProperty('--bs', `${bubble.size}px`);
+  camEl.style.setProperty('--bx', `${bubble.x}px`);
+  camEl.style.setProperty('--by', `${bubble.y}px`);
+}
+
+function resizeBubble(delta) {
+  const before = bubble.size;
+  bubble.size += delta;
+  placeBubble();
+  const grown = bubble.size - before;
+  bubble.x -= grown / 2;
+  bubble.y -= grown / 2;
+  placeBubble();
+  prefs.bubbleSize = bubble.size;
+  savePrefs();
+}
+
+camEl.addEventListener('pointerdown', (e) => {
+  if (!camEl.classList.contains('is-bubble') || e.button !== 0 || e.target.closest('button')) return;
+  const start = { px: e.clientX, py: e.clientY, x: bubble.x, y: bubble.y };
+  camEl.setPointerCapture(e.pointerId);
+  camEl.classList.add('is-dragging');
+  const move = (ev) => {
+    bubble.x = start.x + ev.clientX - start.px;
+    bubble.y = start.y + ev.clientY - start.py;
+    placeBubble();
+  };
+  const end = () => {
+    camEl.classList.remove('is-dragging');
+    camEl.removeEventListener('pointermove', move);
+    camEl.removeEventListener('pointerup', end);
+    camEl.removeEventListener('pointercancel', end);
+  };
+  camEl.addEventListener('pointermove', move);
+  camEl.addEventListener('pointerup', end);
+  camEl.addEventListener('pointercancel', end);
+});
+
+camEl.addEventListener('wheel', (e) => {
+  if (!camEl.classList.contains('is-bubble')) return;
+  e.preventDefault();
+  resizeBubble(e.deltaY < 0 ? 16 : -16);
+}, { passive: false });
+
+camEl.addEventListener('click', (e) => {
+  const act = e.target.closest('[data-bubble]')?.dataset.bubble;
+  if (act === 'smaller') resizeBubble(-40);
+  if (act === 'bigger') resizeBubble(40);
+  if (act === 'hide') toggleCamera();
+});
+
+addEventListener('resize', () => {
+  if (!camEl.hidden && camEl.classList.contains('is-bubble')) placeBubble();
+});
 
 function tick() {
   const s = R.session;
@@ -743,11 +862,16 @@ function updateRecUI() {
   pauseBtn.innerHTML = icon(paused ? 'play' : 'pause');
   pauseBtn.title = label;
   pauseBtn.setAttribute('aria-label', label);
+  const camLabel = R.camHidden ? 'Mostrar cámara' : 'Ocultar cámara';
+  const camIcon = icon(R.camHidden ? 'webcam' : 'webcamOff');
+  const setBtn = (b, html, text) => { if (b) { b.innerHTML = html; b.title = text; b.setAttribute('aria-label', text); } };
+  setBtn($('#cam-btn'), camIcon, camLabel);
   const doc = floatingDoc();
   if (doc) {
     doc.body.classList.toggle('paused', paused);
-    const b = doc.querySelector('[data-act="pause"]');
-    if (b) { b.innerHTML = icon(paused ? 'play' : 'pause'); b.title = label; b.setAttribute('aria-label', label); }
+    doc.body.classList.toggle('no-cam', !s.camera || R.camHidden);
+    setBtn(doc.querySelector('[data-act="pause"]'), icon(paused ? 'play' : 'pause'), label);
+    setBtn(doc.querySelector('[data-act="cam"]'), camIcon, camLabel);
   }
   tick();
 }
@@ -822,7 +946,7 @@ function teardownRecordingUI() {
   const floating = R.floating;
   R.floating = null;
   closeFloating(floating);
-  Object.assign(R, { session: null, starting: false, finishing: false, thumb: null, size: null });
+  Object.assign(R, { session: null, starting: false, finishing: false, thumb: null, size: null, camHidden: false, pipSize: null });
   const bar = $('#rec-bar');
   bar.hidden = true;
   bar.classList.remove('is-paused', 'is-saving');
@@ -852,6 +976,7 @@ $('#start-rec').addEventListener('click', startRecording);
 $('#pause-btn').addEventListener('click', togglePause);
 $('#stop-btn').addEventListener('click', finishRecording);
 $('#discard-btn').addEventListener('click', () => cancelRecording(true));
+$('#cam-btn').addEventListener('click', toggleCamera);
 $('#bubble-btn').addEventListener('click', async () => {
   const floating = await openFloating(!!R.session?.camera);
   if (!R.session) { closeFloating(floating); return; }
